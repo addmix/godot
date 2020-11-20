@@ -2627,6 +2627,59 @@ TypedArray<Node> Node::_get_children() const {
 	return arr;
 }
 
+
+TypedArray<Node> Node::_get_descendants() const {
+	int cc = get_child_count();
+	int dc = get_descendant_count();
+
+	//array for descendants
+	TypedArray<Node> arr;
+	arr.resize(dc);
+
+	int cd = 0;
+	//assign children into array
+	for (int i = 0; i < cc; i++) {
+		//add child to array
+		arr[cd] = get_child(i);
+		//update last indicie value
+		cd++;
+
+		Node child = *get_child(i);
+		//get descendants of child
+		TypedArray<Node> descendants = child._get_descendants();
+		int descendant_count = child.get_descendant_count();
+
+		//loop through and assign child's descendants
+		for (int x = 0; x < descendant_count; x++) {
+			arr[cd] = descendants[x];
+			cd++;
+		}
+	}
+
+	//returns all descendents of node
+	return arr;
+}
+
+int Node::get_descendant_count() const {
+	//descendants count
+	int descendants = 0;
+
+	//child count
+	int cc = get_child_count();
+	descendants = descendants + cc;
+
+	//loop through and add descendants
+	for (int i = 0; i < cc; i++) {
+		Node child = *get_child(i);
+		//get descendants of child
+		descendants = descendants + child.get_descendant_count();
+	}
+
+	//return descendant count
+	return descendants;
+}
+
+
 void Node::set_import_path(const NodePath &p_import_path) {
 #ifdef TOOLS_ENABLED
 	data.import_path = p_import_path;
@@ -2721,7 +2774,9 @@ void Node::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("add_child", "node", "legible_unique_name"), &Node::add_child, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("remove_child", "node"), &Node::remove_child);
 	ClassDB::bind_method(D_METHOD("get_child_count"), &Node::get_child_count);
+	ClassDB::bind_method(D_METHOD("get_descendant_count"), &Node::get_descendant_count);
 	ClassDB::bind_method(D_METHOD("get_children"), &Node::_get_children);
+	ClassDB::bind_method(D_METHOD("get_descendants"), &Node::_get_descendants);
 	ClassDB::bind_method(D_METHOD("get_child", "idx"), &Node::get_child);
 	ClassDB::bind_method(D_METHOD("has_node", "path"), &Node::has_node);
 	ClassDB::bind_method(D_METHOD("get_node", "path"), &Node::get_node);
