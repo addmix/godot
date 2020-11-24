@@ -16,7 +16,6 @@
 /* permit persons to whom the Software is furnished to do so, subject to */
 /* the following conditions:                                             */
 /*                                                                       */
-/* The above copyright notice and this permission notice shall be        */
 /* included in all copies or substantial portions of the Software.       */
 /*                                                                       */
 /* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
@@ -2627,7 +2626,6 @@ TypedArray<Node> Node::_get_children() const {
 	return arr;
 }
 
-
 TypedArray<Node> Node::_get_descendants() const {
 	int cc = get_child_count();
 	int dc = get_descendant_count();
@@ -2678,7 +2676,6 @@ int Node::get_descendant_count() const {
 	//return descendant count
 	return descendants;
 }
-
 
 void Node::set_import_path(const NodePath &p_import_path) {
 #ifdef TOOLS_ENABLED
