@@ -16,6 +16,7 @@
 /* permit persons to whom the Software is furnished to do so, subject to */
 /* the following conditions:                                             */
 /*                                                                       */
+/* The above copyright notice and this permission notice shall be        */
 /* included in all copies or substantial portions of the Software.       */
 /*                                                                       */
 /* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,       */
@@ -2627,54 +2628,54 @@ TypedArray<Node> Node::_get_children() const {
 }
 
 TypedArray<Node> Node::_get_descendants() const {
-	int cc = get_child_count();
-	int dc = get_descendant_count();
+    int cc = get_child_count();
+    int dc = get_descendant_count();
 
-	//array for descendants
-	TypedArray<Node> arr;
-	arr.resize(dc);
+    //array for descendants
+    TypedArray<Node> arr;
+    arr.resize(dc);
 
-	int cd = 0;
-	//assign children into array
-	for (int i = 0; i < cc; i++) {
-		//add child to array
-		arr[cd] = get_child(i);
-		//update last indicie value
-		cd++;
+    int cd = 0;
+    //assign children into array
+    for (int i = 0; i < cc; i++) {
+        //add child to array
+        arr[cd] = get_child(i);
+        //update last indicie value
+        cd++;
 
-		Node child = *get_child(i);
-		//get descendants of child
-		TypedArray<Node> descendants = child._get_descendants();
-		int descendant_count = child.get_descendant_count();
+        Node* child = get_child(i);
+        //get descendants of child
+        TypedArray<Node> descendants = child->_get_descendants();
+        int descendant_count = child->get_descendant_count();
 
-		//loop through and assign child's descendants
-		for (int x = 0; x < descendant_count; x++) {
-			arr[cd] = descendants[x];
-			cd++;
-		}
-	}
+        //loop through and assign child's descendants
+        for (int x = 0; x < descendant_count; x++) {
+            arr[cd] = descendants[x];
+            cd++;
+        }
+    }
 
-	//returns all descendents of node
-	return arr;
+    //returns all descendents of node
+    return arr;
 }
 
 int Node::get_descendant_count() const {
-	//descendants count
-	int descendants = 0;
+    //descendants count
+    int descendants = 0;
 
-	//child count
-	int cc = get_child_count();
-	descendants = descendants + cc;
+    //child count
+    int cc = get_child_count();
+    descendants = descendants + cc;
 
-	//loop through and add descendants
-	for (int i = 0; i < cc; i++) {
-		Node child = *get_child(i);
-		//get descendants of child
-		descendants = descendants + child.get_descendant_count();
-	}
+    //loop through and add descendants
+    for (int i = 0; i < cc; i++) {
+        Node* child = get_child(i);
+        //get descendants of child
+        descendants = descendants + child->get_descendant_count();
+    }
 
-	//return descendant count
-	return descendants;
+    //return descendant count
+    return descendants;
 }
 
 void Node::set_import_path(const NodePath &p_import_path) {
