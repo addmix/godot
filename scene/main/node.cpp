@@ -2627,7 +2627,7 @@ TypedArray<Node> Node::_get_children() const {
 	return arr;
 }
 
-TypedArray<Node> Node::_get_descendants() const{
+TypedArray<Node> Node::_get_descendants() const {
 	int cc = get_child_count();
   int dc = get_descendant_count();
 
@@ -2636,7 +2636,7 @@ TypedArray<Node> Node::_get_descendants() const{
 
 	int cd = 0;
 
-	for(int i = 0; i < cc; i++) {
+	for (int i = 0; i < cc; i++) {
 		arr[cd] = get_child(i);
 		cd++;
 
@@ -2645,7 +2645,7 @@ TypedArray<Node> Node::_get_descendants() const{
 		TypedArray<Node> descendants = child->_get_descendants();
 		int descendant_count = child->get_descendant_count();
 
-		for(int x = 0; x < descendant_count; x++) {
+		for (int x = 0; x < descendant_count; x++) {
 			arr[cd] = descendants[x];
 			cd++;
 		}
@@ -2653,13 +2653,13 @@ TypedArray<Node> Node::_get_descendants() const{
 	return arr;
 }
 
-int Node::get_descendant_count() const{
+int Node::get_descendant_count() const {
 	int descendants = 0;
 
-	int cc = get_child_count()
+	int cc = get_child_count();
 	descendants = descendants + cc;
 
-	for(int i = 0; i < cc; i++) {
+	for (int i = 0; i < cc; i++) {
 		Node* child = get_child(i);
 		descendants = descendants + child->get_descendant_count();
 	}
