@@ -176,6 +176,7 @@ private:
 	Node *_duplicate(int p_flags, Map<const Node *, Node *> *r_duplimap = nullptr) const;
 
 	TypedArray<Node> _get_children() const;
+	TypedArray<Node> _get_descendants() const;
 	Array _get_groups() const;
 
 	Variant _rpc_bind(const Variant **p_args, int p_argcount, Callable::CallError &r_error);
@@ -269,6 +270,7 @@ public:
 
 	int get_child_count() const;
 	Node *get_child(int p_index) const;
+	int get_descendant_count() const;
 	bool has_node(const NodePath &p_path) const;
 	Node *get_node(const NodePath &p_path) const;
 	Node *get_node_or_null(const NodePath &p_path) const;
