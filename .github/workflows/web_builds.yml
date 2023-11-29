@@ -5,9 +5,15 @@ on:
 # Global Settings
 env:
   # Used for the cache key. Add version suffix to force clean build.
+<<<<<<< HEAD
   GODOT_BASE_BRANCH: master
   SCONSFLAGS: verbose=yes warnings=extra werror=yes debug_symbols=no use_closure_compiler=yes
   EM_VERSION: 3.1.64
+=======
+  GODOT_BASE_BRANCH: 4.2
+  SCONSFLAGS: verbose=yes warnings=extra werror=yes debug_symbols=no
+  EM_VERSION: 3.1.39
+>>>>>>> 0bf12956a1 (Bump version to 4.2.1-rc)
   EM_CACHE_FOLDER: "emsdk-cache"
 
 concurrency:

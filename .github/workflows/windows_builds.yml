@@ -6,8 +6,13 @@ on:
 # SCONS_CACHE for windows must be set in the build environment
 env:
   # Used for the cache key. Add version suffix to force clean build.
+<<<<<<< HEAD
   GODOT_BASE_BRANCH: master
   SCONSFLAGS: verbose=yes warnings=extra werror=yes module_text_server_fb_enabled=yes d3d12=yes "angle_libs=${{github.workspace}}/"
+=======
+  GODOT_BASE_BRANCH: 4.2
+  SCONSFLAGS: verbose=yes warnings=extra werror=yes module_text_server_fb_enabled=yes
+>>>>>>> 0bf12956a1 (Bump version to 4.2.1-rc)
   SCONS_CACHE_MSVC_CONFIG: true
 
 concurrency:

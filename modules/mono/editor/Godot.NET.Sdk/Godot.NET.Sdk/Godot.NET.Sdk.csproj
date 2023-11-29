@@ -7,7 +7,11 @@
     <Authors>Godot Engine contributors</Authors>
 
     <PackageId>Godot.NET.Sdk</PackageId>
+<<<<<<< HEAD
     <Version>4.3.0</Version>
+=======
+    <Version>4.2.1</Version>
+>>>>>>> 0bf12956a1 (Bump version to 4.2.1-rc)
     <PackageVersion>$(PackageVersion_Godot_NET_Sdk)</PackageVersion>
     <RepositoryUrl>https://github.com/godotengine/godot/tree/master/modules/mono/editor/Godot.NET.Sdk</RepositoryUrl>
     <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
