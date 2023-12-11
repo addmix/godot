@@ -1,15 +1,10 @@
 short_name = "godot"
 name = "Godot Engine"
 major = 4
-<<<<<<< HEAD
-minor = 3
-patch = 0
-status = "stable"
-=======
 minor = 2
 patch = 1
-status = "rc"
->>>>>>> 0bf12956a1 (Bump version to 4.2.1-rc)
+status = "stable"
 module_config = ""
+year = 2023
 website = "https://godotengine.org"
-docs = "4.3"
+docs = "4.2"
