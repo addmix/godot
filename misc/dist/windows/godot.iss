@@ -1,9 +1,5 @@
 #define MyAppName "Godot Engine"
-<<<<<<< HEAD
-#define MyAppVersion "4.3"
-=======
-#define MyAppVersion "4.2.1"
->>>>>>> 0bf12956a1 (Bump version to 4.2.1-rc)
+#define MyAppVersion "4.2.2"
 #define MyAppPublisher "Godot Engine contributors"
 #define MyAppURL "https://godotengine.org/"
 #define MyAppExeName "godot.exe"
