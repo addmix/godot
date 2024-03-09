@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 - 2024 the ThorVG project. All rights reserved.
+ * Copyright (c) 2021 - 2024 the ThorVG project. All rights reserved.
 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -21,9 +21,8 @@
  */
 
 #include <memory.h>
-#include <webp/decode.h>
-
-#include "tvgWebpLoader.h"
+#include "tvgLoader.h"
+#include "tvgPngLoader.h"
 
 
 /************************************************************************/
@@ -31,17 +30,23 @@
 /************************************************************************/
 
 
-void WebpLoader::run(unsigned tid)
+void PngLoader::run(unsigned tid)
 {
-    //TODO: acquire the current colorspace format & pre-multiplied alpha image.
-    surface.buf8 = WebPDecodeBGRA(data, size, nullptr, nullptr);
-    surface.stride = (uint32_t)w;
-    surface.w = (uint32_t)w;
-    surface.h = (uint32_t)h;
-    surface.channelSize = sizeof(uint32_t);
-    surface.cs = ColorSpace::ARGB8888;
-    surface.premultiplied = false;
+    auto width = static_cast<unsigned>(w);
+    auto height = static_cast<unsigned>(h);
 
+    state.info_raw.colortype = LCT_RGBA;   //request this image format
+
+    if (lodepng_decode(&surface.buf8, &width, &height, &state, data, size)) {
+        TVGERR("PNG", "Failed to decode image");
+    }
+
+    //setup the surface
+    surface.stride = width;
+    surface.w = width;
+    surface.h = height;
+    surface.cs = ColorSpace::ABGR8888;
+    surface.channelSize = sizeof(uint32_t);
 }
 
 
@@ -49,58 +54,62 @@ void WebpLoader::run(unsigned tid)
 /* External Class Implementation                                        */
 /************************************************************************/
 
-WebpLoader::WebpLoader() : ImageLoader(FileType::Webp)
+PngLoader::PngLoader() : ImageLoader(FileType::Png)
 {
+    lodepng_state_init(&state);
 }
 
 
-WebpLoader::~WebpLoader()
+PngLoader::~PngLoader()
 {
-    this->done();
-
     if (freeData) free(data);
-    data = nullptr;
-    size = 0;
-    freeData = false;
-    WebPFree(surface.buf8);
+    free(surface.buf8);
+    lodepng_state_cleanup(&state);
 }
 
 
-bool WebpLoader::open(const string& path)
+bool PngLoader::open(const string& path)
 {
-    auto webpFile = fopen(path.c_str(), "rb");
-    if (!webpFile) return false;
+    auto pngFile = fopen(path.c_str(), "rb");
+    if (!pngFile) return false;
 
     auto ret = false;
 
     //determine size
-    if (fseek(webpFile, 0, SEEK_END) < 0) goto finalize;
-    if (((size = ftell(webpFile)) < 1)) goto finalize;
-    if (fseek(webpFile, 0, SEEK_SET)) goto finalize;
+    if (fseek(pngFile, 0, SEEK_END) < 0) goto finalize;
+    if (((size = ftell(pngFile)) < 1)) goto finalize;
+    if (fseek(pngFile, 0, SEEK_SET)) goto finalize;
 
     data = (unsigned char *) malloc(size);
     if (!data) goto finalize;
 
     freeData = true;
 
-    if (fread(data, size, 1, webpFile) < 1) goto finalize;
+    if (fread(data, size, 1, pngFile) < 1) goto finalize;
 
-    int width, height;
-    if (!WebPGetInfo(data, size, &width, &height)) goto finalize;
+    lodepng_state_init(&state);
+
+    unsigned int width, height;
+    if (lodepng_inspect(&width, &height, &state, data, size) > 0) goto finalize;
 
     w = static_cast<float>(width);
     h = static_cast<float>(height);
 
     ret = true;
 
+    goto finalize;
+
 finalize:
-    fclose(webpFile);
+    fclose(pngFile);
     return ret;
 }
 
 
-bool WebpLoader::open(const char* data, uint32_t size, bool copy)
+bool PngLoader::open(const char* data, uint32_t size, bool copy)
 {
+    unsigned int width, height;
+    if (lodepng_inspect(&width, &height, &state, (unsigned char*)(data), size) > 0) return false;
+
     if (copy) {
         this->data = (unsigned char *) malloc(size);
         if (!this->data) return false;
@@ -111,22 +120,19 @@ bool WebpLoader::open(const char* data, uint32_t size, bool copy)
         freeData = false;
     }
 
-    int width, height;
-    if (!WebPGetInfo(this->data, size, &width, &height)) return false;
-
     w = static_cast<float>(width);
     h = static_cast<float>(height);
-    surface.cs = ColorSpace::ARGB8888;
     this->size = size;
+
     return true;
 }
 
 
-bool WebpLoader::read()
+bool PngLoader::read()
 {
-    if (!LoadModule::read()) return true;
-
     if (!data || w == 0 || h == 0) return false;
+
+    if (!LoadModule::read()) return true;
 
     TaskScheduler::request(this);
 
@@ -134,9 +140,8 @@ bool WebpLoader::read()
 }
 
 
-Surface* WebpLoader::bitmap()
+Surface* PngLoader::bitmap()
 {
     this->done();
-
     return ImageLoader::bitmap();
 }

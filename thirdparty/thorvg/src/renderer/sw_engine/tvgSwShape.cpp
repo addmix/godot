@@ -22,41 +22,56 @@
 
 #include "tvgSwCommon.h"
 #include "tvgMath.h"
-#include "tvgLines.h"
+#include "tvgBezier.h"
 
 /************************************************************************/
 /* Internal Class Implementation                                        */
 /************************************************************************/
 
-static bool _outlineBegin(SwOutline& outline)
+struct Line
 {
-    //Make a contour if lineTo/curveTo without calling close or moveTo beforehand.
-    if (outline.pts.empty()) return false;
-    outline.cntrs.push(outline.pts.count - 1);
-    outline.closed.push(false);
-    outline.pts.push(outline.pts[outline.cntrs.last()]);
-    outline.types.push(SW_CURVE_TYPE_POINT);
-    return false;
+    Point pt1;
+    Point pt2;
+};
+
+
+static float _lineLength(const Point& pt1, const Point& pt2)
+{
+    Point diff = {pt2.x - pt1.x, pt2.y - pt1.y};
+    return sqrtf(diff.x * diff.x + diff.y * diff.y);
 }
 
 
-static bool _outlineEnd(SwOutline& outline)
+static void _lineSplitAt(const Line& cur, float at, Line& left, Line& right)
 {
-    if (outline.pts.empty()) return false;
-    outline.cntrs.push(outline.pts.count - 1);
-    outline.closed.push(false);
-    return false;
+    auto len = _lineLength(cur.pt1, cur.pt2);
+    auto dx = ((cur.pt2.x - cur.pt1.x) / len) * at;
+    auto dy = ((cur.pt2.y - cur.pt1.y) / len) * at;
+    left.pt1 = cur.pt1;
+    left.pt2.x = left.pt1.x + dx;
+    left.pt2.y = left.pt1.y + dy;
+    right.pt1 = left.pt2;
+    right.pt2 = cur.pt2;
 }
 
 
-static bool _outlineMoveTo(SwOutline& outline, const Point* to, const Matrix* transform, bool closed = false)
+static void _outlineEnd(SwOutline& outline)
 {
-    //make it a contour, if the last contour is not closed yet.
-    if (!closed) _outlineEnd(outline);
+    if (outline.pts.empty()) return;
+    outline.cntrs.push(outline.pts.count - 1);
+    outline.closed.push(false);
+}
+
+
+static void _outlineMoveTo(SwOutline& outline, const Point* to, const Matrix* transform)
+{
+    if (outline.pts.count > 0) {
+        outline.cntrs.push(outline.pts.count - 1);
+        outline.closed.push(false);
+    }
 
     outline.pts.push(mathTransform(to, transform));
     outline.types.push(SW_CURVE_TYPE_POINT);
-    return false;
 }
 
 
@@ -80,34 +95,31 @@ static void _outlineCubicTo(SwOutline& outline, const Point* ctrl1, const Point*
 }
 
 
-static bool _outlineClose(SwOutline& outline)
+static void _outlineClose(SwOutline& outline)
 {
-    uint32_t i;
+    uint32_t i = 0;
+
     if (outline.cntrs.count > 0) i = outline.cntrs.last() + 1;
-    else i = 0;
+    else i = 0;   //First Path
 
     //Make sure there is at least one point in the current path
-    if (outline.pts.count == i) return false;
+    if (outline.pts.count == i) return;
 
     //Close the path
     outline.pts.push(outline.pts[i]);
-    outline.cntrs.push(outline.pts.count - 1);
     outline.types.push(SW_CURVE_TYPE_POINT);
     outline.closed.push(true);
-
-    return true;
 }
 
 
 static void _dashLineTo(SwDashStroke& dash, const Point* to, const Matrix* transform)
 {
     Line cur = {dash.ptCur, *to};
-    auto len = lineLength(cur.pt1, cur.pt2);
+    auto len = _lineLength(cur.pt1, cur.pt2);
 
     if (mathZero(len)) {
         _outlineMoveTo(*dash.outline, &dash.ptCur, transform);
-    //draw the current line fully
-    } else if (len <= dash.curLen) {
+    } else if (len < dash.curLen) {
         dash.curLen -= len;
         if (!dash.curOpGap) {
             if (dash.move) {
@@ -116,15 +128,14 @@ static void _dashLineTo(SwDashStroke& dash, const Point* to, const Matrix* trans
             }
             _outlineLineTo(*dash.outline, to, transform);
         }
-    //draw the current line partially
     } else {
         while (len - dash.curLen > 0.0001f) {
             Line left, right;
             if (dash.curLen > 0) {
                 len -= dash.curLen;
-                lineSplitAt(cur, dash.curLen, left, right);
+                _lineSplitAt(cur, dash.curLen, left, right);
                 if (!dash.curOpGap) {
-                    if (dash.move || dash.pattern[dash.curIdx] - dash.curLen < FLOAT_EPSILON) {
+                    if (dash.move || dash.pattern[dash.curIdx] - dash.curLen < FLT_EPSILON) {
                         _outlineMoveTo(*dash.outline, &left.pt1, transform);
                         dash.move = false;
                     }
@@ -165,10 +176,9 @@ static void _dashCubicTo(SwDashStroke& dash, const Point* ctrl1, const Point* ct
     Bezier cur = {dash.ptCur, *ctrl1, *ctrl2, *to};
     auto len = bezLength(cur);
 
-    //draw the current line fully
     if (mathZero(len)) {
         _outlineMoveTo(*dash.outline, &dash.ptCur, transform);
-    } else if (len <= dash.curLen) {
+    } else if (len < dash.curLen) {
         dash.curLen -= len;
         if (!dash.curOpGap) {
             if (dash.move) {
@@ -177,7 +187,6 @@ static void _dashCubicTo(SwDashStroke& dash, const Point* ctrl1, const Point* ct
             }
             _outlineCubicTo(*dash.outline, ctrl1, ctrl2, to, transform);
         }
-    //draw the current line partially
     } else {
         while ((len - dash.curLen) > 0.0001f) {
             Bezier left, right;
@@ -185,7 +194,7 @@ static void _dashCubicTo(SwDashStroke& dash, const Point* ctrl1, const Point* ct
                 len -= dash.curLen;
                 bezSplitAt(cur, dash.curLen, left, right);
                 if (!dash.curOpGap) {
-                    if (dash.move || dash.pattern[dash.curIdx] - dash.curLen < FLOAT_EPSILON) {
+                    if (dash.move || dash.pattern[dash.curIdx] - dash.curLen < FLT_EPSILON) {
                         _outlineMoveTo(*dash.outline, &left.start, transform);
                         dash.move = false;
                     }
@@ -227,15 +236,7 @@ static void _dashClose(SwDashStroke& dash, const Matrix* transform)
 }
 
 
-static void _dashMoveTo(SwDashStroke& dash, const Point* pts)
-{
-    dash.ptCur = *pts;
-    dash.ptStart = *pts;
-    dash.move = true;
-}
-
-
-static void _dashMoveTo(SwDashStroke& dash, uint32_t offIdx, float offset, const Point* pts)
+static void _dashMoveTo(SwDashStroke& dash, uint32_t offIdx, float offset, const Point* pts, const Matrix* transform)
 {
     dash.curIdx = offIdx % dash.cnt;
     dash.curLen = dash.pattern[dash.curIdx] - offset;
@@ -245,86 +246,7 @@ static void _dashMoveTo(SwDashStroke& dash, uint32_t offIdx, float offset, const
 }
 
 
-static void _trimPattern(SwDashStroke* dash, const RenderShape* rshape, float length)
-{
-    auto begin = length * rshape->stroke->trim.begin;
-    auto end = length * rshape->stroke->trim.end;
-
-    //default
-    if (end > begin) {
-        if (begin > 0.0f) dash->cnt = 4;
-        else dash->cnt = 2;
-        //looping
-    } else dash->cnt = 3;
-
-    if (dash->cnt == 2) {
-        dash->pattern[0] = end - begin;
-        dash->pattern[1] = length - (end - begin);
-    } else if (dash->cnt == 3) {
-        dash->pattern[0] = end;
-        dash->pattern[1] = (begin - end);
-        dash->pattern[2] = length - begin;
-    } else {
-        dash->pattern[0] = 0;     //zero dash to start with a space.
-        dash->pattern[1] = begin;
-        dash->pattern[2] = end - begin;
-        dash->pattern[3] = length - end;
-    }
-}
-
-
-static float _outlineLength(const RenderShape* rshape, uint32_t shiftPts, uint32_t shiftCmds, bool subpath)
-{
-    const PathCommand* cmds = rshape->path.cmds.data + shiftCmds;
-    auto cmdCnt = rshape->path.cmds.count - shiftCmds;
-    const Point* pts = rshape->path.pts.data + shiftPts;
-    auto ptsCnt = rshape->path.pts.count - shiftPts;
-
-    //No actual shape data
-    if (cmdCnt <= 0 || ptsCnt <= 0) return 0.0f;
-
-    const Point* close = nullptr;
-    auto length = 0.0f;
-
-    //must begin with moveTo
-    if (cmds[0] == PathCommand::MoveTo) {
-        close = pts;
-        cmds++;
-        pts++;
-        cmdCnt--;
-    }
-
-    while (cmdCnt-- > 0) {
-        switch (*cmds) {
-            case PathCommand::Close: {
-                length += mathLength(pts - 1, close);
-                if (subpath) return length;
-                break;
-            }
-            case PathCommand::MoveTo: {
-                if (subpath) return length;
-                close = pts;
-                ++pts;
-                break;
-            }
-            case PathCommand::LineTo: {
-                length += mathLength(pts - 1, pts);
-                ++pts;
-                break;
-            }
-            case PathCommand::CubicTo: {
-                length += bezLength({*(pts - 1), *pts, *(pts + 1), *(pts + 2)});
-                pts += 3;
-                break;
-            }
-        }
-        ++cmds;
-    }
-    return length;
-}
-
-
-static SwOutline* _genDashOutline(const RenderShape* rshape, const Matrix* transform, bool trimmed, SwMpool* mpool, unsigned tid)
+static SwOutline* _genDashOutline(const RenderShape* rshape, const Matrix* transform, float length, SwMpool* mpool, unsigned tid)
 {
     const PathCommand* cmds = rshape->path.cmds.data;
     auto cmdCnt = rshape->path.cmds.count;
@@ -334,23 +256,49 @@ static SwOutline* _genDashOutline(const RenderShape* rshape, const Matrix* trans
     //No actual shape data
     if (cmdCnt == 0 || ptsCnt == 0) return nullptr;
 
-    auto startPts = pts;
-    auto startCmds = cmds;
-
     SwDashStroke dash;
     auto offset = 0.0f;
-    dash.cnt = rshape->strokeDash((const float**)&dash.pattern, &offset);
-    auto simultaneous = rshape->stroke->trim.simultaneous;
+    auto trimmed = false;
 
-    if (dash.cnt == 0) {
-        if (trimmed) dash.pattern = (float*)malloc(sizeof(float) * 4);
-        else return nullptr;
+    dash.cnt = rshape->strokeDash((const float**)&dash.pattern, &offset);
+
+    //dash by trimming.
+    if (length > 0.0f && dash.cnt == 0) {
+        auto begin = length * rshape->stroke->trim.begin;
+        auto end = length * rshape->stroke->trim.end;
+
+        //TODO: mix trimming + dash style
+
+        //default
+        if (end > begin) {
+            if (begin > 0) dash.cnt += 4;
+            else dash.cnt += 2;
+        //looping
+        } else dash.cnt += 3;
+
+        dash.pattern = (float*)malloc(sizeof(float) * dash.cnt);
+
+        if (dash.cnt == 2) {
+            dash.pattern[0] = end - begin;
+            dash.pattern[1] = length - (end - begin);
+        } else if (dash.cnt == 3) {
+            dash.pattern[0] = end;
+            dash.pattern[1] = (begin - end);
+            dash.pattern[2] = length - begin;
+        } else {
+            dash.pattern[0] = 0;     //zero dash to start with a space.
+            dash.pattern[1] = begin;
+            dash.pattern[2] = end - begin;
+            dash.pattern[3] = length - (end - begin);
+        }
+
+        trimmed = true;
+    //just a dasy style.
     } else {
-        //TODO: handle dash + trim - for now trimming ignoring is forced
-        trimmed = false;
+        if (dash.cnt == 0) return nullptr;
     }
 
-    //offset
+    //offset?
     auto patternLength = 0.0f;
     uint32_t offIdx = 0;
     if (!mathZero(offset)) {
@@ -358,7 +306,7 @@ static SwOutline* _genDashOutline(const RenderShape* rshape, const Matrix* trans
         bool isOdd = dash.cnt % 2;
         if (isOdd) patternLength *= 2;
 
-        offset = fmodf(offset, patternLength);
+        offset = fmod(offset, patternLength);
         if (offset < 0) offset += patternLength;
 
         for (size_t i = 0; i < dash.cnt * (1 + (size_t)isOdd); ++i, ++offIdx) {
@@ -370,27 +318,14 @@ static SwOutline* _genDashOutline(const RenderShape* rshape, const Matrix* trans
 
     dash.outline = mpoolReqDashOutline(mpool, tid);
 
-    //must begin with moveTo
-    if (cmds[0] == PathCommand::MoveTo) {
-        if (trimmed) _trimPattern(&dash, rshape, _outlineLength(rshape, 0, 0, simultaneous));
-        _dashMoveTo(dash, offIdx, offset, pts);
-        cmds++;
-        pts++;
-    }
-
-    while (--cmdCnt > 0) {
+    while (cmdCnt-- > 0) {
         switch (*cmds) {
             case PathCommand::Close: {
                 _dashClose(dash, transform);
                 break;
             }
             case PathCommand::MoveTo: {
-                if (trimmed) {
-                    if (simultaneous) {
-                        _trimPattern(&dash, rshape, _outlineLength(rshape, pts - startPts, cmds - startCmds, true));
-                        _dashMoveTo(dash, offIdx, offset, pts);
-                    } else _dashMoveTo(dash, pts);
-                } else _dashMoveTo(dash, offIdx, offset, pts);
+                _dashMoveTo(dash, offIdx, offset, pts, transform);
                 ++pts;
                 break;
             }
@@ -416,11 +351,53 @@ static SwOutline* _genDashOutline(const RenderShape* rshape, const Matrix* trans
 }
 
 
+static float _outlineLength(const RenderShape* rshape)
+{
+    const PathCommand* cmds = rshape->path.cmds.data;
+    auto cmdCnt = rshape->path.cmds.count;
+    const Point* pts = rshape->path.pts.data;
+    auto ptsCnt = rshape->path.pts.count;
+
+    //No actual shape data
+    if (cmdCnt == 0 || ptsCnt == 0) return 0.0f;
+
+    const Point* close = nullptr;
+    auto length = 0.0f;
+
+    //Compute the whole length
+    while (cmdCnt-- > 0) {
+        switch (*cmds) {
+            case PathCommand::Close: {
+                length += mathLength(pts - 1, close);
+                ++pts;
+                break;
+            }
+            case PathCommand::MoveTo: {
+                close = pts;
+                ++pts;
+                break;
+            }
+            case PathCommand::LineTo: {
+                length += mathLength(pts - 1, pts);
+                ++pts;
+                break;
+            }
+            case PathCommand::CubicTo: {
+                length += bezLength({*(pts - 1), *pts, *(pts + 1), *(pts + 2)});
+                pts += 3;
+                break;
+            }
+        }
+        ++cmds;
+    }
+    return length;
+}
+
+
 static bool _axisAlignedRect(const SwOutline* outline)
 {
     //Fast Track: axis-aligned rectangle?
     if (outline->pts.count != 5) return false;
-    if (outline->types[2] == SW_CURVE_TYPE_CUBIC) return false;
 
     auto pt1 = outline->pts.data + 0;
     auto pt2 = outline->pts.data + 1;
@@ -448,28 +425,25 @@ static bool _genOutline(SwShape* shape, const RenderShape* rshape, const Matrix*
 
     shape->outline = mpoolReqOutline(mpool, tid);
     auto outline = shape->outline;
-    auto closed = false;
 
     //Generate Outlines
     while (cmdCnt-- > 0) {
         switch (*cmds) {
             case PathCommand::Close: {
-                if (!closed) closed = _outlineClose(*outline);
+                _outlineClose(*outline);
                 break;
             }
             case PathCommand::MoveTo: {
-                closed = _outlineMoveTo(*outline, pts, transform, closed);
+                _outlineMoveTo(*outline, pts, transform);
                 ++pts;
                 break;
             }
             case PathCommand::LineTo: {
-                if (closed) closed = _outlineBegin(*outline);
                 _outlineLineTo(*outline, pts, transform);
                 ++pts;
                 break;
             }
             case PathCommand::CubicTo: {
-                if (closed) closed = _outlineBegin(*outline);
                 _outlineCubicTo(*outline, pts, pts + 1, pts + 2, transform);
                 pts += 3;
                 break;
@@ -478,7 +452,7 @@ static bool _genOutline(SwShape* shape, const RenderShape* rshape, const Matrix*
         ++cmds;
     }
 
-    if (!closed) _outlineEnd(*outline);
+    _outlineEnd(*outline);
 
     outline->fillRule = rshape->rule;
     shape->outline = outline;
@@ -593,10 +567,11 @@ bool shapeGenStrokeRle(SwShape* shape, const RenderShape* rshape, const Matrix* 
     auto dashStroking = false;
     auto ret = true;
 
+    auto length = rshape->strokeTrim() ? _outlineLength(rshape) : 0.0f;
+
     //Dash style (+trimming)
-    auto trimmed = rshape->strokeTrim();
-    if (rshape->stroke->dashCnt > 0 || trimmed) {
-        shapeOutline = _genDashOutline(rshape, transform, trimmed, mpool, tid);
+    if (rshape->stroke->dashCnt > 0 || length > 0) {
+        shapeOutline = _genDashOutline(rshape, transform, length, mpool, tid);
         if (!shapeOutline) return false;
         dashStroking = true;
     //Normal style

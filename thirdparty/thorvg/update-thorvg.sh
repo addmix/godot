@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-VERSION=0.14.2
+VERSION=0.12.7
 
 cd thirdparty/thorvg/ || true
 rm -rf AUTHORS LICENSE inc/ src/ *.zip *.tar.gz tmp/
@@ -38,12 +38,7 @@ cat << EOF > ../inc/config.h
 #define THORVG_SVG_LOADER_SUPPORT
 #define THORVG_PNG_LOADER_SUPPORT
 #define THORVG_JPG_LOADER_SUPPORT
-#ifndef WEB_ENABLED
 #define THORVG_THREAD_SUPPORT
-#endif
-
-// Added conditionally if webp module is enabled.
-//#define THORVG_WEBP_LOADER_SUPPORT
 
 // For internal debugging:
 //#define THORVG_LOG_ENABLED
@@ -60,13 +55,11 @@ cp -rv src/renderer ../src/
 rm -rfv ../src/renderer/gl_engine
 rm -rfv ../src/renderer/wg_engine
 
-# Enabled embedded loaders: raw, JPEG, PNG, WebP.
+# Enabled embedded loaders: raw, JPEG, PNG.
 mkdir ../src/loaders
 cp -rv src/loaders/svg src/loaders/raw  ../src/loaders/
-cp -rv src/loaders/external_png ../src/loaders/
-cp -rv src/loaders/external_webp ../src/loaders/
-# Not using external jpg as it's turbojpeg, which we don't have.
-cp -rv src/loaders/jpg ../src/loaders/
+cp -rv src/loaders/jpg  ../src/loaders/
+cp -rv src/loaders/png src/loaders/external_png  ../src/loaders/
 
 popd
 rm -rf tmp
