@@ -71,6 +71,18 @@ void RenderingServerDefault::request_frame_drawn_callback(const Callable &p_call
 void RenderingServerDefault::_draw(bool p_swap_buffers, double frame_step) {
 	RSG::rasterizer->begin_frame(frame_step);
 
+
+	//added to match https://github.com/godotengine/godot/commit/628d8ee0c921d224e316bb2e915fdf59130474d4
+	#ifndef _3D_DISABLED
+	XRServer *xr_server = XRServer::get_singleton();
+	if (xr_server != nullptr) {
+		// let our XR server know we're about to render our frames so we can get our frame timing
+		xr_server->pre_render();
+	}
+	#endif // _3D_DISABLED
+
+
+
 	TIMESTAMP_BEGIN()
 
 	uint64_t time_usec = OS::get_singleton()->get_ticks_usec();
@@ -89,13 +101,14 @@ void RenderingServerDefault::_draw(bool p_swap_buffers, double frame_step) {
 
 	RSG::rasterizer->end_frame(p_swap_buffers);
 
-#ifndef _3D_DISABLED
+//added to match https://github.com/godotengine/godot/commit/628d8ee0c921d224e316bb2e915fdf59130474d4
+/*#ifndef _3D_DISABLED
 	XRServer *xr_server = XRServer::get_singleton();
 	if (xr_server != nullptr) {
 		// let our XR server know we're done so we can get our frame timing
 		xr_server->end_frame();
 	}
-#endif // _3D_DISABLED
+#endif // _3D_DISABLED*/
 
 	RSG::canvas->update_visibility_notifiers();
 	RSG::scene->update_visibility_notifiers();

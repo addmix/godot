@@ -669,8 +669,10 @@ void RendererViewport::draw_viewports(bool p_swap_buffers) {
 	Ref<XRInterface> xr_interface;
 	XRServer *xr_server = XRServer::get_singleton();
 	if (xr_server != nullptr) {
+		
+		//added to match https://github.com/godotengine/godot/commit/628d8ee0c921d224e316bb2e915fdf59130474d4
 		// let our XR server know we're about to render our frames so we can get our frame timing
-		xr_server->pre_render();
+		//xr_server->pre_render();
 
 		// retrieve the interface responsible for rendering
 		xr_interface = xr_server->get_primary_interface();
