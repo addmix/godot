@@ -35,7 +35,7 @@
 #include "scene/3d/importer_mesh_instance_3d.h"
 #include "scene/3d/mesh_instance_3d.h"
 #include "scene/3d/node_3d.h"
-#include "scene/resources/3d/importer_mesh.h"
+#include "scene/resources/importer_mesh.h"
 #include "scene/resources/mesh.h"
 #include "scene/resources/surface_tool.h"
 
@@ -217,7 +217,7 @@ static Error _parse_obj(const String &p_path, List<Ref<ImporterMesh>> &r_meshes,
 		0x14c, // IMAGE_FILE_MACHINE_I386
 		0x200, // IMAGE_FILE_MACHINE_IA64
 	};
-	ERR_FAIL_COND_V_MSG(coff_header_machines.has(first_bytes), ERR_FILE_CORRUPT, vformat("Couldn't read OBJ file '%s', it seems to be binary, corrupted, or empty.", p_path));
+	ERR_FAIL_COND_V_MSG(coff_header_machines.find(first_bytes) != -1, ERR_FILE_CORRUPT, vformat("Couldn't read OBJ file '%s', it seems to be binary, corrupted, or empty.", p_path));
 	f->seek(0);
 
 	Ref<ImporterMesh> mesh;
@@ -306,7 +306,7 @@ static Error _parse_obj(const String &p_path, List<Ref<ImporterMesh>> &r_meshes,
 			Vector<String> face[3];
 			face[0] = v[1].split("/");
 			face[1] = v[2].split("/");
-			ERR_FAIL_COND_V(face[0].is_empty(), ERR_FILE_CORRUPT);
+			ERR_FAIL_COND_V(face[0].size() == 0, ERR_FILE_CORRUPT);
 
 			ERR_FAIL_COND_V(face[0].size() != face[1].size(), ERR_FILE_CORRUPT);
 			for (int i = 2; i < v.size() - 1; i++) {
@@ -384,22 +384,7 @@ static Error _parse_obj(const String &p_path, List<Ref<ImporterMesh>> &r_meshes,
 
 			if (p_disable_compression) {
 				mesh_flags = 0;
-			} else {
-				bool is_mesh_2d = true;
-
-				// Disable compression if all z equals 0 (the mesh is 2D).
-				for (int i = 0; i < vertices.size(); i++) {
-					if (!Math::is_zero_approx(vertices[i].z)) {
-						is_mesh_2d = false;
-						break;
-					}
-				}
-
-				if (is_mesh_2d) {
-					mesh_flags = 0;
-				}
 			}
-
 			//groups are too annoying
 			if (surf_tool->get_vertex_array().size()) {
 				//another group going on, commit it
@@ -424,6 +409,11 @@ static Error _parse_obj(const String &p_path, List<Ref<ImporterMesh>> &r_meshes,
 					surf_tool->set_material(material);
 				}
 
+				if (!current_material.is_empty()) {
+					mesh->set_surface_name(mesh->get_surface_count() - 1, current_material.get_basename());
+				} else if (!current_group.is_empty()) {
+					mesh->set_surface_name(mesh->get_surface_count() - 1, current_group);
+				}
 				Array array = surf_tool->commit_to_arrays();
 
 				if (mesh_flags & RS::ARRAY_FLAG_COMPRESS_ATTRIBUTES && generate_tangents) {
@@ -441,16 +431,6 @@ static Error _parse_obj(const String &p_path, List<Ref<ImporterMesh>> &r_meshes,
 
 				mesh->add_surface(Mesh::PRIMITIVE_TRIANGLES, array, TypedArray<Array>(), Dictionary(), material, name, mesh_flags);
 				print_verbose("OBJ: Added surface :" + mesh->get_surface_name(mesh->get_surface_count() - 1));
-
-				if (!current_material.is_empty()) {
-					if (mesh->get_surface_count() >= 1) {
-						mesh->set_surface_name(mesh->get_surface_count() - 1, current_material.get_basename());
-					}
-				} else if (!current_group.is_empty()) {
-					if (mesh->get_surface_count() >= 1) {
-						mesh->set_surface_name(mesh->get_surface_count() - 1, current_group);
-					}
-				}
 
 				surf_tool->clear();
 				surf_tool->begin(Mesh::PRIMITIVE_TRIANGLES);
@@ -502,7 +482,7 @@ static Error _parse_obj(const String &p_path, List<Ref<ImporterMesh>> &r_meshes,
 		}
 	}
 
-	if (p_single_mesh && mesh->get_surface_count() > 0) {
+	if (p_single_mesh) {
 		r_meshes.push_back(mesh);
 	}
 

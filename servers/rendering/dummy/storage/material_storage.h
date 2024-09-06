@@ -31,6 +31,7 @@
 #ifndef MATERIAL_STORAGE_DUMMY_H
 #define MATERIAL_STORAGE_DUMMY_H
 
+#include "core/templates/rid_owner.h"
 #include "servers/rendering/shader_compiler.h"
 #include "servers/rendering/shader_language.h"
 #include "servers/rendering/storage/material_storage.h"
@@ -75,8 +76,6 @@ public:
 	virtual void global_shader_parameters_instance_update(RID p_instance, int p_index, const Variant &p_value, int p_flags_count = 0) override {}
 
 	/* SHADER API */
-
-	bool owns_shader(RID p_rid) { return shader_owner.owns(p_rid); }
 
 	virtual RID shader_allocate() override;
 	virtual void shader_initialize(RID p_rid) override;
